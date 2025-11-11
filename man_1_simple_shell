@@ -1,0 +1,29 @@
+.TH hsh 1 "Simple Shell Manual" "Holberton School"
+.SH NAME
+hsh \- a simple UNIX command interpreter
+
+.SH SYNOPSIS
+.B hsh
+reads commands from standard input and executes them.
+
+.SH DESCRIPTION
+The
+.B hsh
+program is a minimal implementation of a UNIX shell.  
+It executes commands by searching for the corresponding program in the
+directories stored in the PATH environment variable.  
+It supports interactive and non-interactive modes.
+
+This project is part of the SE curriculum and aims to introduce students to:
+process creation, system calls, environment handling, tokenizing input, and
+implementing basic built-in commands.
+
+.SH FEATURES
+- Command execution using fork and execve  
+- PATH handling  
+- Built-in commands: exit, env  
+- Error messages similar to /bin/sh  
+
+.SH AUTHORS
+Nouf Saud Almutairi  
+Sara Ahmed AlMawkil
