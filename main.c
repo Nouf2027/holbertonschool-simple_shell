@@ -1,27 +1,9 @@
-#include "shell.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <string.h>
-
-/**
- * main - Entry point for the simple shell project (placeholder for next tasks)
- * @argc: argument count
- * @argv: argument vector
- *
- * Return: 0 on success.
- */
-int main(int argc, char **argv)
-{
-(void)argc;
-(void)argv;
-
- /* Placeholder only to keep repo Betty-clean for Task 1 */
-_putchar('\n');
-return (0);
-}
 
 extern char **environ;
 
@@ -110,4 +92,3 @@ waitpid(pid, &status, 0);
 free(line);
 return (0);
 }
-
