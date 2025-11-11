@@ -10,7 +10,7 @@
 int main(int argc, char **argv)
 {
 (void)argc;
- (void)argv;
+(void)argv;
 
  /* Placeholder only to keep repo Betty-clean for Task 1 */
 _putchar('\n');
