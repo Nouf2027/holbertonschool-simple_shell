@@ -1,14 +1,15 @@
 #ifndef SHELL_H
 #define SHELL_H
-
+#include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
-
-/**
- * _putchar - write one character to stdout
- * @c: character to print
- *
- * Return: 1 on success, or -1 on error.
- */
-int _putchar(char c);
-
-#endif /* SHELL_H */
+#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+extern char **environ;
+char *resolve_cmd(const char *name);
+void print_prompt(void);
+void strip_newline(char *s);
+char *ltrim_rtrim(char *s);
+int make_argv(char *line,char **argv,int cap);
+#endif
