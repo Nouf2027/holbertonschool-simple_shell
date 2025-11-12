@@ -1,17 +1,19 @@
 #include "shell.h"
 
 static int shell_step(void);
+static int g_status;
 
 /**
  * exec_external - fork/exec and wait for an external command
  * @argv: argument vector (NULL-terminated)
- * @status: pointer to last status code
+ * @status: pointer to last status code (updated)
  *
- * Return: 0 on success path (regardless of child exit code), -1 on fork error
+ * Return: 0 on parent path, -1 on fork error
  */
 int exec_external(char **argv, int *status)
 {
 	pid_t pid = fork();
+	int st = 0;
 
 	if (pid == -1)
 	{
@@ -22,15 +24,20 @@ int exec_external(char **argv, int *status)
 	{
 		if (execvp(argv[0], argv) == -1)
 		{
-			perror("execvp");
-			_exit(EXIT_FAILURE);
+			perror(argv[0]);
+			_exit(127);
 		}
+		_exit(0);
 	}
-	else
-	{
-		if (wait(status) == -1)
-			perror("wait");
-	}
+	if (wait(&st) == -1)
+		perror("wait");
+
+	if (WIFEXITED(st))
+		*status = WEXITSTATUS(st);
+	else if (WIFSIGNALED(st))
+		*status = 128 + WTERMSIG(st);
+
+	g_status = *status;
 	return (0);
 }
 
@@ -44,10 +51,12 @@ static int shell_step(void)
 	char *line = NULL;
 	size_t len = 0;
 	char **argv = NULL;
-	int cap = 64, status = 0, n, bret;
+	int cap = 64, n, bret;
 	ssize_t rd;
 
-	print_prompt();
+	if (isatty(STDIN_FILENO))
+		print_prompt();
+
 	rd = getline(&line, &len, stdin);
 	if (rd == -1)
 	{
@@ -86,7 +95,8 @@ static int shell_step(void)
 		return (1);
 	}
 
-	(void)exec_external(argv, &status);
+	(void)exec_external(argv, &g_status);
+
 	free(argv);
 	free(line);
 	return (1);
@@ -95,11 +105,11 @@ static int shell_step(void)
 /**
  * run_shell - REPL loop of the simple shell
  *
- * Return: 0 on clean exit
+ * Return: last command status (used as process exit status)
  */
 int run_shell(void)
 {
 	while (shell_step())
 		;
-	return (0);
+	return (g_status);
 }
