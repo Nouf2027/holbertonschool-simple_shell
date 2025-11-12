@@ -7,7 +7,6 @@ static int g_status;
  * exec_external - fork/exec and wait for an external command
  * @argv: argument vector (NULL-terminated)
  * @status: pointer to last status code (updated)
- *
  * Return: 0 on parent path, -1 on fork error
  */
 int exec_external(char **argv, int *status)
@@ -43,7 +42,6 @@ int exec_external(char **argv, int *status)
 
 /**
  * shell_step - executes a single REPL iteration
- *
  * Return: 1 to continue loop, 0 to stop
  */
 static int shell_step(void)
@@ -104,7 +102,6 @@ static int shell_step(void)
 
 /**
  * run_shell - REPL loop of the simple shell
- *
  * Return: last command status (used as process exit status)
  */
 int run_shell(void)
