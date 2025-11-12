@@ -35,9 +35,28 @@ while(tok&&c<cap-1){argv[c++]=tok;tok=strtok(NULL," \t");}
 argv[c]=NULL;
 return c;
 }
+static char *find_in_path(const char *cmd)
+{
+char *path,*dir,*full;
+if(strchr(cmd,'/'))return strdup(cmd);
+path=getenv("PATH");
+if(!path)return NULL;
+path=strdup(path);
+dir=strtok(path,":");
+while(dir)
+{
+full=malloc(strlen(dir)+strlen(cmd)+2);
+sprintf(full,"%s/%s",dir,cmd);
+if(access(full,X_OK)==0){free(path);return full;}
+free(full);
+dir=strtok(NULL,":");
+}
+free(path);
+return NULL;
+}
 int main(void)
 {
-char *line=NULL,*work,*argv[64];
+char *line=NULL,*work,*argv[64],*cmdpath;
 size_t cap=0;
 ssize_t n;
 int interactive,status,argc;
@@ -57,14 +76,17 @@ work=ltrim_rtrim(line);
 if(!*work)continue;
 argc=make_argv(work,argv,64);
 if(argc==0)continue;
+cmdpath=find_in_path(argv[0]);
+if(!cmdpath){write(STDERR_FILENO,argv[0],strlen(argv[0]));write(STDERR_FILENO,": not found\n",12);continue;}
 pid=fork();
-if(pid==-1)continue;
+if(pid==-1){free(cmdpath);continue;}
 if(pid==0)
 {
-execve(argv[0],argv,environ);
+execve(cmdpath,argv,environ);
 perror(argv[0]);
 _exit(127);
 }
+free(cmdpath);
 waitpid(pid,&status,0);
 }
 free(line);
