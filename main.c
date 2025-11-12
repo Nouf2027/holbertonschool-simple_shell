@@ -1,37 +1,249 @@
 #include "shell.h"
 
-static char *path_value(void){int i=0;while(environ&&environ[i]){if(strncmp(environ[i],"PATH=",5)==0)return environ[i]+5;i++;}return NULL;}
-
-char *resolve_cmd(const char *name){char *pv,*dup,*tok,*p;size_t sz;if(!name||!*name)return NULL;if(strchr(name,'/')){if(access(name,X_OK)==0)return strdup(name);return NULL;}pv=path_value();if(!pv)return NULL;dup=strdup(pv);if(!dup)return NULL;tok=strtok(dup,":");while(tok){sz=strlen(tok)+1+strlen(name)+1;p=malloc(sz);if(p){snprintf(p,sz,"%s/%s",tok,name);if(access(p,X_OK)==0){free(dup);return p;}free(p);}tok=strtok(NULL,":");}free(dup);return NULL;}
-
-void print_prompt(void){write(STDOUT_FILENO,"$ ",2);}
-void strip_newline(char *s){size_t n;if(!s)return;n=strlen(s);if(n&&s[n-1]=='\n')s[n-1]='\0';}
-char *ltrim_rtrim(char *s){size_t i=0,j,n;if(!s)return s;n=strlen(s);while(i<n&&(s[i]==' '||s[i]=='\t'))i++;j=n;while(j>i&&(s[j-1]==' '||s[j-1]=='\t'))j--;s[j]='\0';return s+i;}
-int make_argv(char *line,char **argv,int cap){int c=0;char *t=strtok(line," \t");while(t&&c<cap-1){argv[c++]=t;t=strtok(NULL," \t");}argv[c]=NULL;return c;}
-
-int main(int ac,char **av)
+/**
+ * main - Entry point for the simple shell
+ * @argc: Argument count
+ * @argv: Argument vector
+ * @env: Environment variables
+ *
+ * Return: 0 on success
+ */
+int main(int argc, char **argv, char **env)
 {
-char *line=NULL,*work,*argv[64],*cmd=NULL;size_t cap=0;ssize_t n;int interactive,status,argc,last_status=0;unsigned long lineno=0;pid_t pid;char *prog=(av&&av[0])?av[0]:"./hsh";(void)ac;
-interactive=isatty(STDIN_FILENO);
-for(;;){
-if(interactive)print_prompt();
-n=getline(&line,&cap,stdin);
-if(n==-1){if(interactive)write(STDOUT_FILENO,"\n",1);break;}
-strip_newline(line);
-work=ltrim_rtrim(line);
-if(!*work)continue;
-argc=make_argv(work,argv,64);
-if(argc==0)continue;
-lineno++;
-cmd=resolve_cmd(argv[0]);
-if(!cmd){fprintf(stderr,"%s: %lu: %s: not found\n",prog,lineno,argv[0]);last_status=127;continue;}
-pid=fork();
-if(pid==-1){free(cmd);last_status=1;continue;}
-if(pid==0){execve(cmd,argv,environ);_exit(127);}
-waitpid(pid,&status,0);
-if(WIFEXITED(status))last_status=WEXITSTATUS(status);else last_status=1;
-free(cmd);
+    char *command;
+    char **args;
+    int status = 1;
+    (void)argc;
+    (void)argv;
+    (void)env;
+
+    while (status)
+    {
+        if (isatty(STDIN_FILENO))
+            display_prompt();
+
+        command = read_command();
+        if (command == NULL)
+        {
+            if (isatty(STDIN_FILENO))
+                write(STDOUT_FILENO, "\n", 1);
+            break;
+        }
+
+        args = parse_command(command);
+        if (args[0] != NULL)
+        {
+            status = execute_command(args);
+        }
+
+        free(command);
+        free(args);
+    }
+
+    return (0);
 }
-free(line);
-return last_status;
+
+/**
+ * display_prompt - Displays the shell prompt
+ */
+void display_prompt(void)
+{
+    write(STDOUT_FILENO, "($) ", 4);
+}
+
+/**
+ * read_command - Reads a command from stdin
+ *
+ * Return: Pointer to the command string
+ */
+char *read_command(void)
+{
+    char *command = NULL;
+    size_t len = 0;
+    ssize_t nread;
+
+    nread = getline(&command, &len, stdin);
+    if (nread == -1)
+    {
+        free(command);
+        return (NULL);
+    }
+
+    if (command[nread - 1] == '\n')
+        command[nread - 1] = '\0';
+
+    return (command);
+}
+
+/**
+ * parse_command - Parses a command string into arguments
+ * @command: The command string to parse
+ *
+ * Return: Array of argument strings
+ */
+char **parse_command(char *command)
+{
+    char **args = malloc(64 * sizeof(char *));
+    char *token;
+    int i = 0;
+
+    if (!args)
+    {
+        perror("malloc");
+        exit(EXIT_FAILURE);
+    }
+
+    token = strtok(command, " ");
+    while (token != NULL)
+    {
+        args[i] = token;
+        i++;
+        token = strtok(NULL, " ");
+    }
+    args[i] = NULL;
+
+    return (args);
+}
+
+/**
+ * execute_command - Executes a command
+ * @args: Array of command arguments
+ *
+ * Return: 1 to continue, 0 to exit
+ */
+int execute_command(char **args)
+{
+    pid_t pid;
+    int status;
+    char *full_path;
+
+    if (check_builtin(args))
+        return (1);
+
+    full_path = find_path(args[0]);
+    if (!full_path)
+    {
+        fprintf(stderr, "./hsh: 1: %s: not found\n", args[0]);
+        return (1);
+    }
+
+    pid = fork();
+    if (pid == -1)
+    {
+        perror("fork");
+        free(full_path);
+        return (1);
+    }
+    else if (pid == 0)
+    {
+        if (execve(full_path, args, environ) == -1)
+        {
+            fprintf(stderr, "./hsh: 1: %s: not found\n", args[0]);
+            free(full_path);
+            exit(EXIT_FAILURE);
+        }
+    }
+    else
+    {
+        wait(&status);
+        free(full_path);
+    }
+
+    return (1);
+}
+
+/**
+ * check_builtin - Checks if command is a builtin
+ * @args: Array of command arguments
+ *
+ * Return: 1 if builtin was executed, 0 otherwise
+ */
+int check_builtin(char **args)
+{
+    if (args[0] == NULL)
+        return (1);
+
+    if (strcmp(args[0], "exit") == 0)
+    {
+        exit(0);
+    }
+    else if (strcmp(args[0], "env") == 0)
+    {
+        char **env = environ;
+        while (*env)
+        {
+            printf("%s\n", *env);
+            env++;
+        }
+        return (1);
+    }
+
+    return (0);
+}
+
+/**
+ * find_path - Finds the full path of a command
+ * @command: The command to find
+ *
+ * Return: Full path of command, or NULL if not found
+ */
+char *find_path(char *command)
+{
+    char *path, *path_copy, *dir, *full_path;
+    struct stat st;
+
+    if (strchr(command, '/') != NULL)
+    {
+        if (stat(command, &st) == 0)
+            return (strdup(command));
+        return (NULL);
+    }
+
+    path = getenv("PATH");
+    if (!path)
+        return (NULL);
+
+    path_copy = strdup(path);
+    if (!path_copy)
+        return (NULL);
+
+    dir = strtok(path_copy, ":");
+    while (dir)
+    {
+        full_path = build_path(dir, command);
+        if (stat(full_path, &st) == 0)
+        {
+            free(path_copy);
+            return (full_path);
+        }
+        free(full_path);
+        dir = strtok(NULL, ":");
+    }
+
+    free(path_copy);
+    return (NULL);
+}
+
+/**
+ * build_path - Builds a full path from directory and command
+ * @path: Directory path
+ * @command: Command name
+ *
+ * Return: Full path string
+ */
+char *build_path(char *path, char *command)
+{
+    char *full_path;
+    size_t len;
+
+    len = strlen(path) + strlen(command) + 2;
+    full_path = malloc(len);
+    if (!full_path)
+        return (NULL);
+
+    strcpy(full_path, path);
+    strcat(full_path, "/");
+    strcat(full_path, command);
+
+    return (full_path);
 }
